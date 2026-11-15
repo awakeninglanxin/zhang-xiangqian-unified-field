@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>洛伦兹破缺结构可视化 · 宏观与微观</title>
+<style>
+  :root{
+    --bg:#0d1220; --card:#161f30; --card2:#1b2639;
+    --ink:#e9f0fa; --dim:#9fb0c8; --line:#2a3a52;
+    --ok:#4fd1c5; --bad:#ff9166; --gold:#ffd479;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"WenQuanYi Micro Hei","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    line-height:1.7;font-size:15px}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 16px 60px}
+  h1{font-size:23px;margin:0 0 6px;letter-spacing:.5px}
+  h2{font-size:16px;margin:0 0 12px;color:var(--gold)}
+  .sub{color:var(--dim);font-size:13.5px;margin:0 0 18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+  .panel{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .ctl label{display:block;font-size:12.5px;color:var(--dim);margin-bottom:4px}
+  .ctl input[type=range]{width:100%;accent-color:var(--bad)}
+  .ctl select{width:100%;background:#0f1828;color:var(--ink);border:1px solid var(--line);
+    border-radius:7px;padding:6px 8px;font-size:14px}
+  .val{color:var(--gold);font-variant-numeric:tabular-nums;font-weight:600}
+  .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  canvas{width:100%;height:auto;display:block;border-radius:8px;background:#0c1424}
+  .cap{font-size:12.5px;color:var(--dim);margin-top:8px}
+  .tag{display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:99px;
+    border:1px solid var(--line);margin-right:6px}
+  .tag.ok{color:var(--ok);border-color:#2b6b67}
+  .tag.bad{color:var(--bad);border-color:#7a4433}
+  .eq{background:#0b1322;border-left:3px solid var(--ok);border-radius:0 8px 8px 0;
+    padding:10px 12px;margin:9px 0;font-family:"DejaVu Serif",Georgia,serif;
+    font-size:15px;overflow-x:auto;white-space:nowrap;color:#dce9ff}
+  .eq.bad{border-left-color:var(--bad)}
+  .eq .n{color:var(--gold);font-family:inherit;font-size:12px;margin-right:8px}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;
+    font-size:.86em;margin:0 2px}
+  .frac i{font-style:normal;padding:0 4px}
+  .frac i:first-child{border-bottom:1px solid currentColor}
+  sub,sup{font-size:.7em}
+  .note{font-size:12.8px;color:var(--dim);margin:6px 0 0}
+  .cmp{display:grid;grid-template-columns:110px 1fr 1fr;gap:0;font-size:13.5px}
+  .cmp>div{padding:9px 10px;border-bottom:1px solid var(--line)}
+  .cmp .h{color:var(--gold);font-weight:600;background:#101a2b}
+  .cmp .k{color:var(--dim)}
+  .foot{font-size:12.5px;color:var(--dim);border-top:1px dashed var(--line);padding-top:14px;margin-top:6px}
+  b.ok{color:var(--ok)} b.bad{color:var(--bad)} b.g{color:var(--gold)}
+  @media(max-width:620px){ .cmp{grid-template-columns:80px 1fr 1fr;font-size:12px} .eq{font-size:13.5px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>洛伦兹破缺长什么样：从宏观平均到微观单畴</h1>
+<p class="sub">这里「破缺」不是力线断了，而是：<b class="bad">时空里出现一个坐标无关的背景张量 κ<sub>ij</sub></b>，于是等频面由圆变畸变、能流／力线不再沿径向、带电粒子回旋轨道由正圆变椭圆，并随地球转动出现恒星日调制。图由下方公式实时计算绘制。</p>
+
+<div class="card">
+  <h2>① 调参（公式直接驱动绘图）</h2>
+  <div class="controls">
+    <div class="ctl"><label>裸破缺幅度 δ₀ = <span class="val" id="v_d0">0.20</span></label>
+      <input type="range" id="d0" min="0" max="0.40" step="0.01" value="0.20"></div>
+    <div class="ctl"><label>优先轴 θ₀ = <span class="val" id="v_th">25°</span></label>
+      <input type="range" id="th" min="0" max="180" step="1" value="25"></div>
+    <div class="ctl"><label>能标 log₁₀(E/Λ) = <span class="val" id="v_E">-6.0</span></label>
+      <input type="range" id="E" min="-9" max="0" step="0.1" value="-6"></div>
+    <div class="ctl"><label>算符质量量纲 d = <span class="val" id="v_d">5</span></label>
+      <select id="dim"><option>3</option><option>4</option><option selected>5</option><option>6</option></select></div>
+    <div class="ctl"><label>宏观平均畴数 N = <span class="val" id="v_N">200</span></label>
+      <input type="range" id="N" min="1" max="1000" step="1" value="200"></div>
+  </div>
+  <p class="note">当前有效幅度 δ<sub>eff</sub>(E) = <span class="val" id="v_de">—</span>；宏观多畴平均后 ⟨κ⟩<sub>L</sub> = <span class="val" id="v_dm">—</span>；但二阶残余 ⟨κ²⟩ ∝ δ<sub>eff</sub>² = <span class="val" id="v_d2">—</span>（实验测的正是这一项）。</p>
+</div>
+
+<div class="card">
+  <h2>② 专门公式（SME 参数化，非张氏动量公式）</h2>
+
+  <div class="eq"><span class="n">①</span> ℒ<sub>photon</sub> = −¼ F<sub>μν</sub>F<sup>μν</sup> − ¼ (k<sub>F</sub>)<sub>μνρσ</sub> F<sup>μν</sup>F<sup>ρσ</sup> &nbsp;；&nbsp;
+       ℒ<sub>fermion</sub> = ½ i ψ̄(γ<sup>ν</sup> + c<sup>μν</sup>γ<sub>μ</sub>) ↔∂<sub>ν</sub>ψ − m ψ̄ψ</div>
+  <p class="note">标准模型扩展把所有可能的洛伦兹破缺写成「背景张量系数 × 常规算符」；系数按粒子 sector 独立，不是凭空一句话。</p>
+
+  <div class="eq bad"><span class="n">②</span> κ<sub>ij</sub> = δ<sub>eff</sub> ( n̂<sub>i</sub>n̂<sub>j</sub> − ½ δ<sub>ij</sub> ) &nbsp;,&nbsp; n̂ = (cos θ₀, sin θ₀) &nbsp;（无迹四极，2D 版）</div>
+
+  <div class="eq bad"><span class="n">③</span> ω² = c² ( k² + κ<sub>ij</sub> k<sub>i</sub> k<sub>j</sub> ) &nbsp;⇒&nbsp;
+       等频面 &nbsp; k(θ) = <span class="frac"><i>k₀</i><i>√(1 + δ<sub>eff</sub> cos2(θ−θ₀))</i></span></div>
+  <p class="note">δ<sub>eff</sub>=0 时是正圆 → 各向同性；δ<sub>eff</sub>≠0 时沿优先轴压缩、垂直方向拉伸 → 出现「方向」。</p>
+
+  <div class="eq bad"><span class="n">④</span> v<sub>g</sub> = ∇<sub>k</sub>ω ，
+       tan ψ = − <span class="frac"><i>1</i><i>k</i></span> <span class="frac"><i>dk</i><i>dθ</i></span>
+       = − <span class="frac"><i>δ<sub>eff</sub> sin2(θ−θ₀)</i><i>1 + δ<sub>eff</sub> cos2(θ−θ₀)</i></span></div>
+  <p class="note">ψ 是能流／力线偏离径向的角度。洛伦兹不变时 ψ≡0；破缺时 ψ≠0，这就是图中「力线歪掉」的来源。</p>
+
+  <div class="eq"><span class="n">⑤</span> δ<sub>eff</sub>(E) = δ₀ ( E / Λ )<sup>d−4</sup> &nbsp;；&nbsp;
+       d = 3,4 → 低能不抑制（早该看见，已被排除）；d ≥ 5 → 随 E 放大</div>
+
+  <div class="eq"><span class="n">⑥</span> ⟨κ⟩<sub>L</sub> = κ₀ / √N ， N = ( L / ξ )³ &nbsp;；&nbsp;
+       ⟨κ²⟩ = κ₀² ≠ 0</div>
+  <p class="note">接住「交流平均为零」的类比：宏观一阶矢量确实平均掉，但二阶方差不会消失，而精密实验找的就是各向异性／恒星日调制。宏观看不见 ≠ 没被测过。</p>
+
+  <div class="eq bad"><span class="n">⑦</span> m<sub>ij</sub> = m(δ<sub>ij</sub> + κ<sub>ij</sub>) ，
+       m<sub>ij</sub> <span class="frac"><i>dv<sub>j</sub></i><i>dt</i></span> = q( E<sub>i</sub> + ε<sub>ijk</sub> v<sub>j</sub> B<sub>k</sub> )
+       &nbsp;⇒&nbsp; ω<sub>c</sub>(θ) ≈ (qB/m)[ 1 − δ<sub>eff</sub> cos2(θ−θ₀) ]</div>
+  <p class="note">修正后的洛伦兹力：回旋频率随方向变，正圆轨道变椭圆并进动 —— 下图右侧画的就是它。</p>
+</div>
+
+<div class="card">
+  <h2>③ 三张图：宏观 / 微观 / 力线轨道</h2>
+  <div class="grid3">
+    <div class="panel">
+      <span class="tag ok">宏观 · 洛伦兹不变</span>
+      <canvas id="c1" width="360" height="330"></canvas>
+      <p class="cap">青虚线 = 不变时的等频圆；橙实线 = 当前 δ 下等频面；箭头 = 能流／力线法线方向。宏观多畴平均后 ⟨κ⟩→0，两者几乎重合，箭头仍沿径向。</p>
+    </div>
+    <div class="panel">
+      <span class="tag bad">微观单畴 · 破缺示意</span>
+      <canvas id="c2" width="360" height="330"></canvas>
+      <p class="cap">优先轴 θ₀ 用橙虚线标出；等频面被压成四极畸变，法线不再过中心的径向（ψ≠0）。<b class="bad">这是参数化可能性，不是已观测事实。</b></p>
+    </div>
+    <div class="panel">
+      <span class="tag ok">力线检验 · 回旋轨道</span>
+      <canvas id="c3" width="360" height="330"></canvas>
+      <p class="cap">青 = 洛伦兹不变的正圆回旋；橙 = m<sub>ij</sub> 各向异性后的椭圆 + 进动。箭头显示力不再恒垂直于半径。</p>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>④ 能标跑动：为什么「宏观无、微观可能有」</h2>
+  <div class="panel"><canvas id="c4" width="1080" height="300"></canvas></div>
+  <p class="cap">横轴 log₁₀(E/Λ)，纵轴 log₁₀ δ<sub>eff</sub>。d≥5 时低能被 (E/Λ)<sup>d−4</sup> 压到近乎零（宏观），高动量转移 Q² 或阈值过程才放大（微观／高能）。灰横线是光子 sector 10⁻¹⁸ 量级的取向各向异性界；右上角「阈值放大」区对应 GZK／真空契伦科夫：无契伦科夫辐射已把 n=3 色散参数压到 η ≲ 10⁻¹⁴。</p>
+</div>
+
+<div class="card">
+  <h2>⑤ 宏观 vs 微观 对照</h2>
+  <div class="cmp">
+    <div class="h">维度</div><div class="h">宏观（L ≫ ξ）</div><div class="h">微观 / 高能（E→Λ）</div>
+    <div class="k">背景结构</div>
+    <div>N≈(L/ξ)³ 个畴，方向杂乱；一阶矢量 ⟨κ⟩=κ₀/√N→0</div>
+    <div>单畴内 κ<sub>ij</sub>≠0，有确定优先轴；等频面畸变、ψ≠0</div>
+    <div class="k">是否有信号</div>
+    <div>一阶为零，<b class="g">二阶 ⟨κ²⟩≠0</b>；表现为各向异性／恒星日调制，正是 10⁻¹⁸（光子）、10⁻³¹ GeV（中子自旋）、CMS 顶夸克 1–8×10⁻³ 所找的东西 —— 至今零结果</div>
+    <div>d≥5 非最小算符尚未被全部封死，是活跃前沿；但 d=3/4 不抑制的低能算符「其缺席已被排除」</div>
+    <div class="k">张氏 C 落哪</div>
+    <div colspan="1"><b class="bad">落在这里，且被排除</b>：全空间同一个确定矢量 C、伽利略式 C−V、拿来算 5 吨飞碟与质量归零，属 d≤4 宏观各向异性，没有 Λ、没有系数表、没有跑动</div>
+    <div>不等于这里：要进微观藏身处，得先交出协变作用量、SME 系数与量纲、阈值／跑动行为、一个可证伪的具体数值</div>
+  </div>
+  <p class="foot"><b>边界声明：</b>本页画的是主流 SME 式、可检验的洛伦兹破缺「如果发生会长什么样」，不是张祥前统一场论的示意图，也不构成任何破缺已被观测到的主张。宏观平均为零确实成立（⑥式），但结论与「科学家误以为光速不变」相反：正因为 ⟨κ²⟩ 不消失，实验才用二阶量把各向异性压到了 10⁻¹⁸ 以下；微观可能性开放的是 d≥5 的参数空间，不是任何跨尺度、无能标的经典矢量场。</p>
+</div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var OK="#4fd1c5", BAD="#ff9166", GOLD="#ffd479", DIM="#9fb0c8", GRID="#223149", INK="#e9f0fa";
+  var PI=Math.PI, TAU=2*PI;
+  function $(id){return document.getElementById(id);}
+  function num(id){return parseFloat($(id).value);}
+  function state(){
+    var d0=num("d0"), th=num("th")*PI/180, El=num("E"), d=parseInt($("dim").value,10), N=num("N");
+    var ratio=Math.pow(10,El);
+    var de=d0*Math.pow(ratio,d-4);
+    var deClamped=Math.min(0.85,de);
+    var dm=deClamped/Math.sqrt(N);
+    return {d0:d0,th:th,El:El,d:d,N:N,de:de,deC:deClamped,dm:dm};
+  }
+  function fmt(x){
+    if(!isFinite(x)) return "—";
+    if(x===0) return "0";
+    var e=Math.floor(Math.log10(Math.abs(x)));
+    if(e>=-3 && e<4) return x.toFixed(4).replace(/0+$/,"").replace(/\.$/,"");
+    return x.toExponential(2);
+  }
+  function setup(cv){
+    var dpr=window.devicePixelRatio||1;
+    var w=cv.clientWidth||cv.width, h=Math.round(w*(cv.height/cv.width));
+    cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+    var ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+    return {ctx:ctx,w:w,h:h};
+  }
+  function arrow(ctx,x1,y1,x2,y2,color,lw){
+    ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=lw||1.6;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    var a=Math.atan2(y2-y1,x2-x1), s=6;
+    ctx.beginPath(); ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-s*Math.cos(a-0.42),y2-s*Math.sin(a-0.42));
+    ctx.lineTo(x2-s*Math.cos(a+0.42),y2-s*Math.sin(a+0.42));
+    ctx.closePath(); ctx.fill();
+  }
+  function label(ctx,txt,x,y,color,size,align){
+    ctx.fillStyle=color||DIM; ctx.font=(size||11)+"px 'WenQuanYi Micro Hei',sans-serif";
+    ctx.textAlign=align||"left"; ctx.fillText(txt,x,y); ctx.textAlign="left";
+  }
+  function kOf(t,delta,th){
+    var q=1+delta*Math.cos(2*(t-th));
+    if(q<0.05) q=0.05;
+    return 1/Math.sqrt(q);
+  }
+  function drawField(cv,delta,th,macro,N){
+    var s=setup(cv), ctx=s.ctx, W=s.w, H=s.h;
+    var cx=W/2, cy=H/2+6, R=Math.min(W,H)*0.31;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle="#0c1424"; ctx.fillRect(0,0,W,H);
+    // polar grid
+    ctx.strokeStyle=GRID; ctx.lineWidth=1;
+    for(var g=1;g<=3;g++){
+      ctx.beginPath(); ctx.arc(cx,cy,R*g/3,0,TAU); ctx.stroke();
+    }
+    for(var a=0;a<12;a++){
+      var t=a*TAU/12;
+      ctx.beginPath(); ctx.moveTo(cx,cy);
+      ctx.lineTo(cx+R*1.06*Math.cos(t),cy+R*1.06*Math.sin(t)); ctx.stroke();
+    }
+    // invariant reference circle
+    ctx.strokeStyle=OK; ctx.setLineDash([5,5]); ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,TAU); ctx.stroke(); ctx.setLineDash([]);
+    label(ctx,"洛伦兹不变：k = k₀",10,18,OK,11);
+    // priority axis
+    if(!macro && delta>0.002){
+      ctx.strokeStyle="rgba(255,145,102,.55)"; ctx.setLineDash([4,4]); ctx.lineWidth=1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx-R*1.25*Math.cos(th),cy-R*1.25*Math.sin(th));
+      ctx.lineTo(cx+R*1.25*Math.cos(th),cy+R*1.25*Math.sin(th));
+      ctx.stroke(); ctx.setLineDash([]);
+      label(ctx,"κ 优先轴 θ₀",cx+R*0.72*Math.cos(th)-34,cy+R*0.72*Math.sin(th)-8,BAD,10.5);
+    }
+    // distorted equal-frequency surface
+    ctx.beginPath();
+    for(var i=0;i<=360;i++){
+      var t=i*TAU/360, r=R*kOf(t,delta,th);
+      var x=cx+r*Math.cos(t), y=cy+r*Math.sin(t);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.fillStyle=macro?"rgba(79,209,197,.07)":"rgba(255,145,102,.13)";
+    ctx.fill();
+    ctx.strokeStyle=macro?OK:BAD; ctx.lineWidth=2.2; ctx.stroke();
+    // normals = energy-flow / force-line direction
+    for(var j=0;j<12;j++){
+      var t2=j*TAU/12;
+      var r2=R*kOf(t2,delta,th);
+      var px=cx+r2*Math.cos(t2), py=cy+r2*Math.sin(t2);
+      var beta=delta*Math.sin(2*(t2-th))/(1+delta*Math.cos(2*(t2-th)));
+      // n ∝ e_r - beta*e_theta
+      var erx=Math.cos(t2), ery=Math.sin(t2), etx=-Math.sin(t2), ety=Math.cos(t2);
+      var nx=erx-beta*etx, ny=ery-beta*ety;
+      var L=Math.hypot(nx,ny)||1; nx/=L; ny/=L;
+      arrow(ctx,px,py,px+nx*24,py+ny*24,macro?OK:BAD,1.4);
+    }
+    // center
+    ctx.fillStyle=INK; ctx.beginPath(); ctx.arc(cx,cy,2.6,0,TAU); ctx.fill();
+    // macro: domain-average inset (deterministic pseudo-random arrows)
+    if(macro){
+      var ox=W-92, oy=H-84;
+      label(ctx,"多畴平均",ox,oy-30,DIM,10.5);
+      var sx=0, sy=0, seed=7;
+      for(var q=0;q<Math.min(N,24);q++){
+        seed=(seed*1103515245+12345)%2147483647;
+        var u=(seed/2147483647)*TAU;
+        var ax=ox+26+(q%6)*9, ay=oy+((q/6)|0)*11;
+        var vx=Math.cos(u)*4.5, vy=Math.sin(u)*4.5;
+        sx+=vx; sy+=vy;
+        ctx.strokeStyle="rgba(159,176,200,.5)"; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(ax-vx,ay-vy); ctx.lineTo(ax+vx,ay+vy); ctx.stroke();
+      }
+      label(ctx,"Σ≈0",ox+58,oy+34,OK,10.5);
+      label(ctx,"但 ⟨κ²⟩≠0",ox,oy+50,GOLD,10.5);
+    }
+    label(ctx,macro?("δ_macro = "+fmt(delta)):("δ_eff = "+fmt(delta)),10,H-12,macro?OK:BAD,11.5);
+  }
+  function drawOrbit(cv,delta,th){
+    var s=setup(cv), ctx=s.ctx, W=s.w, H=s.h;
+    var cx=W/2, cy=H/2, R=Math.min(W,H)*0.28;
+    ctx.clearRect(0,0,W,H); ctx.fillStyle="#0c1424"; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle=GRID; ctx.lineWidth=1;
+    for(var g=-2;g<=2;g++){
+      ctx.beginPath(); ctx.moveTo(cx+g*R/2,cy-R*1.35); ctx.lineTo(cx+g*R/2,cy+R*1.35); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx-R*1.35,cy+g*R/2); ctx.lineTo(cx+R*1.35,cy+g*R/2); ctx.stroke();
+    }
+    // B out of page marker
+    label(ctx,"B ⊙ 出纸面",10,18,DIM,11);
+    // invariant circle
+    ctx.strokeStyle=OK; ctx.lineWidth=2; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,TAU); ctx.stroke(); ctx.setLineDash([]);
+    // anisotropic ellipse, rotated by th, with slow precession offset
+    var a=R*(1+delta*0.9), b=R*(1-delta*0.9), rot=th+0.18*delta;
+    ctx.strokeStyle=BAD; ctx.lineWidth=2.2; ctx.beginPath();
+    for(var i=0;i<=240;i++){
+      var t=i*TAU/240;
+      var x=a*Math.cos(t), y=b*Math.sin(t);
+      var X=x*Math.cos(rot)-y*Math.sin(rot), Y=x*Math.sin(rot)+y*Math.cos(rot);
+      if(i===0) ctx.moveTo(cx+X,cy+Y); else ctx.lineTo(cx+X,cy+Y);
+    }
+    ctx.closePath(); ctx.stroke();
+    // force arrows at a few phases: radial (ok) vs deflected (bad)
+    for(var j=0;j<6;j++){
+      var t2=j*TAU/6;
+      var px=cx+R*Math.cos(t2), py=cy+R*Math.sin(t2);
+      arrow(ctx,px,py,px-Math.cos(t2)*22,py-Math.sin(t2)*22,"rgba(79,209,197,.75)",1.3);
+      var x2=a*Math.cos(t2), y2=b*Math.sin(t2);
+      var X2=x2*Math.cos(rot)-y2*Math.sin(rot), Y2=x2*Math.sin(rot)+y2*Math.cos(rot);
+      var qx=cx+X2, qy=cy+Y2;
+      // v tangent to ellipse, force not exactly radial to center
+      var vx=-a*Math.sin(t2), vy=b*Math.cos(t2);
+      var VX=vx*Math.cos(rot)-vy*Math.sin(rot), VY=vx*Math.sin(rot)+vy*Math.cos(rot);
+      var L=Math.hypot(VX,VY)||1;
+      var fx=-VY/L, fy=VX/L;
+      arrow(ctx,qx,qy,qx+fx*22,qy+fy*22,BAD,1.5);
+    }
+    label(ctx,"正圆：ω_c 各向同性",10,H-30,OK,11);
+    label(ctx,"椭圆：ω_c(θ) 随方向变",10,H-12,BAD,11);
+  }
+  function drawRunning(cv,st){
+    var s=setup(cv), ctx=s.ctx, W=s.w, H=s.h;
+    ctx.clearRect(0,0,W,H); ctx.fillStyle="#0c1424"; ctx.fillRect(0,0,W,H);
+    var L=48,R=W-18,T=22,B=H-34;
+    var xmin=-9,xmax=0,ymin=-20,ymax=0;
+    function X(e){return L+(e-xmin)/(xmax-xmin)*(R-L);}
+    function Y(v){return B-(v-ymin)/(ymax-ymin)*(B-T);}
+    // grid
+    ctx.strokeStyle=GRID; ctx.lineWidth=1; ctx.font="10.5px 'WenQuanYi Micro Hei',sans-serif";
+    for(var e=xmin;e<=xmax;e++){
+      var xx=X(e); ctx.beginPath(); ctx.moveTo(xx,T); ctx.lineTo(xx,B); ctx.stroke();
+      label(ctx,"10"+sup(e),xx-9,H-16,DIM,10);
+    }
+    for(var v=ymax;v>=ymin;v-=4){
+      var yy=Y(v); ctx.beginPath(); ctx.moveTo(L,yy); ctx.lineTo(R,yy); ctx.stroke();
+      label(ctx,"10"+sup(v),6,yy+3,DIM,10);
+    }
+    function sup(n){return String(n).replace(/-/g,"⁻").replace(/0/g,"⁰").replace(/1/g,"¹")
+      .replace(/2/g,"²").replace(/3/g,"³").replace(/4/g,"⁴").replace(/5/g,"⁵")
+      .replace(/6/g,"⁶").replace(/7/g,"⁷").replace(/8/g,"⁸").replace(/9/g,"⁹");}
+    // experimental bound line
+    var yb=Y(-18);
+    ctx.strokeStyle="rgba(159,176,200,.75)"; ctx.setLineDash([6,4]); ctx.lineWidth=1.3;
+    ctx.beginPath(); ctx.moveTo(L,yb); ctx.lineTo(R,yb); ctx.stroke(); ctx.setLineDash([]);
+    label(ctx,"光子 sector 各向异性界 ≈10⁻¹⁸",L+8,yb-6,DIM,10.5);
+    // curves for d=3,4,5,6 with d0=1 reference, highlight current d
+    var dims=[3,4,5,6], cols=["rgba(255,145,102,.35)","rgba(255,145,102,.35)","rgba(255,212,121,.45)","rgba(79,209,197,.4)"];
+    for(var k=0;k<dims.length;k++){
+      var dd=dims[k]; ctx.strokeStyle=(dd===st.d)? (dd<=4?BAD:GOLD) : cols[k];
+      ctx.lineWidth=(dd===st.d)?2.4:1.1; ctx.beginPath();
+      for(var i=0;i<=180;i++){
+        var e=xmin+(xmax-xmin)*i/180;
+        var val=(dd-4)*e;             // log10 delta, d0=1
+        var yv=Math.max(ymin,Math.min(ymax,val));
+        var px=X(e), py=Y(yv);
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+      var ly=Y(Math.max(ymin,Math.min(ymax,(dd-4)*(-1.2))));
+      label(ctx,"d="+dd,X(-1.2)+5,ly-4,(dd===st.d)?(dd<=4?BAD:GOLD):DIM,10.5);
+    }
+    // current point
+    var le=Math.log10(Math.max(1e-20,st.de));
+    var cx=X(st.El), cy=Y(Math.max(ymin,Math.min(ymax,le)));
+    ctx.strokeStyle="rgba(255,255,255,.35)"; ctx.setLineDash([3,4]);
+    ctx.beginPath(); ctx.moveTo(cx,T); ctx.lineTo(cx,B); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=GOLD; ctx.beginPath(); ctx.arc(cx,cy,4.5,0,TAU); ctx.fill();
+    label(ctx,"当前 δ_eff="+fmt(st.de),Math.min(cx+8,R-140),Math.max(T+14,cy-8),GOLD,11);
+    // region labels
+    label(ctx,"◀ 宏观 E≪Λ：压低到近乎零",L+10,B-10,OK,11);
+    label(ctx,"微观 / 高 Q²：阈值放大 ▶",R-205,B-10,BAD,11);
+    if(st.d<=4) label(ctx,"d≤4 不受抑制 → 低能早该看见 → 已被排除",L+10,T+12,BAD,11.5);
+    else label(ctx,"d≥5：随 (E/Λ)^(d−4) 放大，参数空间仍部分开放",L+10,T+12,GOLD,11.5);
+  }
+  function redraw(){
+    var st=state();
+    $("v_d0").textContent=st.d0.toFixed(2);
+    $("v_th").textContent=Math.round(num("th"))+"°";
+    $("v_E").textContent=st.El.toFixed(1);
+    $("v_d").textContent=st.d;
+    $("v_N").textContent=st.N;
+    $("v_de").textContent=fmt(st.de)+(st.de>0.85?"（绘图钳制 0.85）":"");
+    $("v_dm").textContent=fmt(st.dm);
+    $("v_d2").textContent=fmt(st.de*st.de);
+    drawField($("c1"),Math.min(0.85,st.dm),st.th,true,st.N);
+    drawField($("c2"),st.deC,st.th,false,st.N);
+    drawOrbit($("c3"),st.deC,st.th);
+    drawRunning($("c4"),st);
+  }
+  ["d0","th","E","dim","N"].forEach(function(id){
+    $(id).addEventListener("input",redraw);
+    $(id).addEventListener("change",redraw);
+  });
+  window.addEventListener("resize",redraw);
+  redraw();
+})();
+</script>
+</body>
+</html>
